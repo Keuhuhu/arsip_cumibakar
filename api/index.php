@@ -4,9 +4,18 @@
 $storagePath = '/tmp/storage';
 $viewPath = $storagePath . '/framework/views';
 
-// 2. Buat struktur folder secara paksa
-if (!is_dir($viewPath)) {
-    mkdir($viewPath, 0777, true);
+// 2. Buat struktur folder secara paksa untuk Laravel
+$directories = [
+    $viewPath,
+    $storagePath . '/framework/cache/data',
+    $storagePath . '/framework/sessions',
+    $storagePath . '/logs'
+];
+
+foreach ($directories as $dir) {
+    if (!is_dir($dir)) {
+        mkdir($dir, 0777, true);
+    }
 }
 
 // 3. Override folder storage Laravel secara global

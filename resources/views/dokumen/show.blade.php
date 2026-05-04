@@ -77,7 +77,9 @@
                 <span class="card-title">👁️ Preview File</span>
             </div>
             <div class="card-body" style="padding: 0; background: #e5e7eb; min-height: 400px; display:flex; align-items:center; justify-content:center;">
-                @if(in_array($dokumen->file_type, ['application/pdf', 'image/jpeg', 'image/png']))
+                @if(in_array($dokumen->file_type, ['image/jpeg', 'image/png', 'image/gif']))
+                    <img src="{{ route('dokumen.preview', $dokumen) }}" alt="Preview" style="max-width: 100%; max-height: 600px; object-fit: contain;">
+                @elseif($dokumen->file_type === 'application/pdf')
                     <iframe src="{{ route('dokumen.preview', $dokumen) }}" width="100%" height="600" style="border:none;"></iframe>
                 @else
                     <div style="text-align:center; padding: 40px;">
