@@ -5,30 +5,31 @@ namespace App\Http\Controllers;
 use App\Models\ActivityLog;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
 class BackupController extends Controller
 {
-    private string $backupDisk = 'local';
+    private string $backupDisk = 's3';
     private string $backupPath = 'backups';
 
     public function index(): View
     {
         $files = [];
-        if (Storage::disk($this->backupDisk)->exists($this->backupPath)) {
+        try {
             $rawFiles = Storage::disk($this->backupDisk)->files($this->backupPath);
             foreach ($rawFiles as $file) {
                 $files[] = [
-                    'name'       => basename($file),
-                    'path'       => $file,
-                    'size'       => Storage::disk($this->backupDisk)->size($file),
-                    'modified'   => Storage::disk($this->backupDisk)->lastModified($file),
+                    'name'     => basename($file),
+                    'path'     => $file,
+                    'size'     => Storage::disk($this->backupDisk)->size($file),
+                    'modified' => Storage::disk($this->backupDisk)->lastModified($file),
                 ];
             }
-            // Sort by newest
             usort($files, fn($a, $b) => $b['modified'] <=> $a['modified']);
+        } catch (\Exception $e) {
+            // S3 belum dikonfigurasi atau kosong — tampilkan halaman kosong
         }
 
         return view('backup.index', compact('files'));
@@ -37,44 +38,18 @@ class BackupController extends Controller
     public function create(Request $request): RedirectResponse
     {
         try {
-            // Create backup directory
-            Storage::disk($this->backupDisk)->makeDirectory($this->backupPath);
-
-            $filename = 'backup_arsip_cumibakar_' . now()->format('Y-m-d_H-i-s') . '.sql';
+            $filename   = 'backup_arsip_cumibakar_' . now()->format('Y-m-d_H-i-s') . '.sql';
             $backupFile = $this->backupPath . '/' . $filename;
 
-            // Export SQLite database (simple file copy for SQLite)
-            $dbPath = database_path('database.sqlite');
-            if (file_exists($dbPath)) {
-                Storage::disk($this->backupDisk)->put($backupFile, file_get_contents($dbPath));
+            $sql = $this->generateSqlDump();
 
-                ActivityLog::log('backup', "Membuat backup database: {$filename}");
+            Storage::disk($this->backupDisk)->put($backupFile, $sql);
 
-                return back()->with('success', "Backup berhasil dibuat: {$filename}");
-            }
+            ActivityLog::log('backup', "Membuat backup database: {$filename}");
 
-            // For MySQL: use mysqldump
-            $dbConfig = config('database.connections.mysql');
-            if ($dbConfig) {
-                $host     = $dbConfig['host'];
-                $port     = $dbConfig['port'];
-                $database = $dbConfig['database'];
-                $username = $dbConfig['username'];
-                $password = $dbConfig['password'];
-
-                $command = "mysqldump --host={$host} --port={$port} --user={$username} --password={$password} {$database} 2>/dev/null";
-                $output  = shell_exec($command);
-
-                if ($output) {
-                    Storage::disk($this->backupDisk)->put($backupFile, $output);
-                    ActivityLog::log('backup', "Membuat backup database: {$filename}");
-                    return back()->with('success', "Backup berhasil dibuat: {$filename}");
-                }
-            }
-
-            return back()->with('error', 'Gagal membuat backup. Pastikan konfigurasi database benar.');
+            return back()->with('success', "Backup berhasil dibuat: {$filename}");
         } catch (\Exception $e) {
-            return back()->with('error', 'Error saat backup: ' . $e->getMessage());
+            return back()->with('error', 'Gagal membuat backup: ' . $e->getMessage());
         }
     }
 
@@ -105,22 +80,54 @@ class BackupController extends Controller
 
     public function restore(Request $request): RedirectResponse
     {
-        $request->validate(['backup_file' => 'required|file|mimes:sql,sqlite,db']);
+        return back()->with('error', 'Fitur restore manual tidak tersedia di environment ini. Gunakan dashboard Supabase untuk restore data.');
+    }
 
-        try {
-            $file   = $request->file('backup_file');
-            $dbPath = database_path('database.sqlite');
+    // =============================================
+    // Ekspor database menggunakan PDO (tanpa mysqldump)
+    // Bekerja di Windows, Mac, Linux, dan Vercel serverless
+    // =============================================
+    private function generateSqlDump(): string
+    {
+        $connection = config('database.default');
+        $tables     = DB::select('SHOW TABLES');
+        $dbName     = config("database.connections.{$connection}.database");
+        $tableKey   = "Tables_in_{$dbName}";
 
-            // For SQLite
-            if (config('database.default') === 'sqlite') {
-                copy($file->getRealPath(), $dbPath);
-                ActivityLog::log('restore', 'Restore database dari file backup');
-                return back()->with('success', 'Database berhasil direstore.');
+        $output  = "-- Backup Arsip Digital Desa Cumibakar\n";
+        $output .= "-- Dibuat pada: " . now()->format('Y-m-d H:i:s') . "\n";
+        $output .= "-- Database: {$dbName}\n\n";
+        $output .= "SET FOREIGN_KEY_CHECKS=0;\n\n";
+
+        foreach ($tables as $tableRow) {
+            $tableName = $tableRow->$tableKey;
+
+            // DROP + CREATE TABLE
+            $createTable = DB::select("SHOW CREATE TABLE `{$tableName}`");
+            $output .= "DROP TABLE IF EXISTS `{$tableName}`;\n";
+            $output .= $createTable[0]->{'Create Table'} . ";\n\n";
+
+            // INSERT rows
+            $rows = DB::table($tableName)->get();
+            if ($rows->isEmpty()) continue;
+
+            $output .= "INSERT INTO `{$tableName}` VALUES\n";
+            $rowStrings = [];
+
+            foreach ($rows as $row) {
+                $values = array_map(function ($val) {
+                    if ($val === null) return 'NULL';
+                    return "'" . addslashes((string) $val) . "'";
+                }, (array) $row);
+
+                $rowStrings[] = '(' . implode(', ', $values) . ')';
             }
 
-            return back()->with('error', 'Fitur restore untuk MySQL memerlukan konfigurasi tambahan di server.');
-        } catch (\Exception $e) {
-            return back()->with('error', 'Error saat restore: ' . $e->getMessage());
+            $output .= implode(",\n", $rowStrings) . ";\n\n";
         }
+
+        $output .= "SET FOREIGN_KEY_CHECKS=1;\n";
+
+        return $output;
     }
 }
