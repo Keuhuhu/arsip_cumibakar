@@ -1,16 +1,24 @@
 <?php
 
-// 1. Tentukan rute folder sementara di /tmp (satu-satunya area yang bisa ditulisi di Vercel)
-$compiledViewPath = '/tmp/storage/framework/views';
+// 1. Definisikan folder sementara yang bisa ditulis di Vercel
+$storagePath = '/tmp/storage';
+$viewPath = $storagePath . '/framework/views';
 
-// 2. Buat foldernya secara otomatis jika belum ada
-if (!is_dir($compiledViewPath)) {
-    mkdir($compiledViewPath, 0777, true);
+// 2. Buat struktur folder secara paksa
+if (!is_dir($viewPath)) {
+    mkdir($viewPath, 0777, true);
 }
 
-// 3. Paksa Laravel untuk menggunakan folder sementara ini sebagai tempat pemrosesan View/Blade
-$_ENV['VIEW_COMPILED_PATH'] = $compiledViewPath;
-putenv('VIEW_COMPILED_PATH=' . $compiledViewPath);
+// 3. Override folder storage Laravel secara global
+// Ini akan memindahkan views, sessions, dan cache ke /tmp
+putenv("APP_STORAGE=$storagePath");
+putenv("VIEW_COMPILED_PATH=$viewPath");
 
-// 4. Lanjutkan memuat aplikasi utama Laravel
+// 4. Pastikan Laravel tidak menggunakan file cache lama dari build
+putenv("APP_CONFIG_CACHE=/tmp/config.php");
+putenv("APP_ROUTES_CACHE=/tmp/routes.php");
+putenv("APP_SERVICES_CACHE=/tmp/services.php");
+putenv("APP_PACKAGES_CACHE=/tmp/packages.php");
+
+// 5. Muat aplikasi utama
 require __DIR__ . '/../public/index.php';
