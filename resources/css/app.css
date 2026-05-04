@@ -49,24 +49,8 @@ html { scroll-behavior: smooth; }
 a { color: var(--hijau); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
-/* ===== LAYOUT & GRID ===== */
+/* ===== LAYOUT ===== */
 .wrapper { display: flex; min-height: 100vh; }
-
-.row {
-    display: flex;
-    flex-wrap: wrap;
-    margin: 0 -10px;
-}
-.row > [class^="col-"] {
-    padding: 0 10px;
-    width: 100%;
-}
-@media (min-width: 768px) {
-    .col-4 { flex: 0 0 33.333333%; max-width: 33.333333%; }
-    .col-6 { flex: 0 0 50%; max-width: 50%; }
-    .col-8 { flex: 0 0 66.666667%; max-width: 66.666667%; }
-    .col-12 { flex: 0 0 100%; max-width: 100%; }
-}
 
 /* ===== SIDEBAR ===== */
 .sidebar {
