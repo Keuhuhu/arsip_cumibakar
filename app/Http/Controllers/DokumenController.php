@@ -71,7 +71,7 @@ class DokumenController extends Controller
         // Upload file
         $file = $request->file('file');
         $fileName  = time() . '_' . str_replace(' ', '_', $file->getClientOriginalName());
-        $filePath  = $file->storeAs('dokumen/' . now()->format('Y/m'), $fileName, 'public');
+        $filePath  = $file->storeAs('dokumen/' . now()->format('Y/m'), $fileName, 's3');
 
         // Generate no_urut
         $noUrut = Dokumen::whereYear('created_at', now()->year)->max('no_urut') + 1;
@@ -131,12 +131,12 @@ class DokumenController extends Controller
         ]);
 
         if ($request->hasFile('file')) {
-            // Delete old file
-            Storage::disk('public')->delete($dokumen->file_path);
+            // Delete old file from S3
+            Storage::disk('s3')->delete($dokumen->file_path);
 
             $file = $request->file('file');
             $fileName = time() . '_' . str_replace(' ', '_', $file->getClientOriginalName());
-            $filePath = $file->storeAs('dokumen/' . now()->format('Y/m'), $fileName, 'public');
+            $filePath = $file->storeAs('dokumen/' . now()->format('Y/m'), $fileName, 's3');
 
             $validated['file_path'] = $filePath;
             $validated['file_name'] = $file->getClientOriginalName();
@@ -160,7 +160,7 @@ class DokumenController extends Controller
     public function destroy(Dokumen $dokumen): RedirectResponse
     {
         $perihal = $dokumen->perihal;
-        Storage::disk('public')->delete($dokumen->file_path);
+        Storage::disk('s3')->delete($dokumen->file_path);
         $dokumen->delete();
 
         ActivityLog::log('delete', "Menghapus dokumen: {$perihal}");
@@ -173,24 +173,23 @@ class DokumenController extends Controller
     {
         ActivityLog::log('download', "Mengunduh dokumen: {$dokumen->perihal}", $dokumen);
 
-        $path = Storage::disk('public')->path($dokumen->file_path);
-
-        if (!file_exists($path)) {
+        if (!Storage::disk('s3')->exists($dokumen->file_path)) {
             abort(404, 'File tidak ditemukan.');
         }
 
-        return response()->download($path, $dokumen->file_name);
+        return Storage::disk('s3')->download($dokumen->file_path, $dokumen->file_name);
     }
 
     public function preview(Dokumen $dokumen)
     {
-        $path = Storage::disk('public')->path($dokumen->file_path);
-
-        if (!file_exists($path)) {
+        if (!Storage::disk('s3')->exists($dokumen->file_path)) {
             abort(404, 'File tidak ditemukan.');
         }
 
-        return response()->file($path);
+        $content  = Storage::disk('s3')->get($dokumen->file_path);
+        $mimeType = $dokumen->file_type ?? 'application/octet-stream';
+
+        return response($content, 200)->header('Content-Type', $mimeType);
     }
 
     public function updateStatus(Request $request, Dokumen $dokumen): RedirectResponse
