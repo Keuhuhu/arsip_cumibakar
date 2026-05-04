@@ -16,6 +16,12 @@ class AppServiceProvider extends ServiceProvider
         // Paksa semua URL menggunakan HTTPS jika berada di lingkungan produksi (Vercel)
         if (config('app.env') === 'production') {
             URL::forceScheme('https');
+            // 2. Solusi Error 500: Alihkan penulisan View ke folder /tmp yang diizinkan Vercel
+        $tmpPath = '/tmp/storage/framework/views';
+        if (!is_dir($tmpPath)) {
+            mkdir($tmpPath, 0777, true);
+        }
+        app('config')->set('view.compiled', $tmpPath);
         }
 
         // Super Admin — bisa melakukan semua hal
