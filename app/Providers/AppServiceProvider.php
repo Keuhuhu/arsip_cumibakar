@@ -5,13 +5,19 @@ namespace App\Providers;
 use App\Models\User;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\URL;
 
 class AppServiceProvider extends ServiceProvider
 {
     protected $policies = [];
 
     public function boot(): void
-    {
+        {
+        // Paksa semua URL menggunakan HTTPS jika berada di lingkungan produksi (Vercel)
+        if (config('app.env') === 'production') {
+            URL::forceScheme('https');
+        }
+
         // Super Admin — bisa melakukan semua hal
         Gate::before(function (User $user, string $ability) {
             if ($user->isSuperAdmin()) {
