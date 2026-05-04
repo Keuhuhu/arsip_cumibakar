@@ -23,10 +23,6 @@ foreach ($directories as $dir) {
 putenv("APP_STORAGE=$storagePath");
 putenv("VIEW_COMPILED_PATH=$viewPath");
 
-
-putenv("DB_CONNECTION=mysql");
-    putenv("DB_DATABASE=$dbDest");
-
 // 4. Pastikan Laravel tidak menggunakan file cache lama dari build
 putenv("APP_CONFIG_CACHE=/tmp/config.php");
 putenv("APP_ROUTES_CACHE=/tmp/routes.php");
