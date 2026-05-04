@@ -23,6 +23,14 @@ foreach ($directories as $dir) {
 putenv("APP_STORAGE=$storagePath");
 putenv("VIEW_COMPILED_PATH=$viewPath");
 
+// 3.5. Pindahkan Database SQLite ke /tmp agar bisa ditulis (tidak Read-Only)
+$dbSource = __DIR__ . '/../database/database.sqlite';
+$dbDest = '/tmp/database.sqlite';
+if (file_exists($dbSource) && !file_exists($dbDest)) {
+    copy($dbSource, $dbDest);
+}
+putenv("DB_DATABASE=$dbDest");
+
 // 4. Pastikan Laravel tidak menggunakan file cache lama dari build
 putenv("APP_CONFIG_CACHE=/tmp/config.php");
 putenv("APP_ROUTES_CACHE=/tmp/routes.php");
