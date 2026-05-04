@@ -29,6 +29,9 @@
     --shadow:      0 1px 3px rgba(0,0,0,.1);
     --shadow-md:   0 4px 12px rgba(0,0,0,.12);
     --sidebar-w:   240px;
+    /* Aliases used in views */
+    --text-dark:   #111827;
+    --border-color:#e5e7eb;
 }
 
 body {
@@ -48,6 +51,16 @@ html { scroll-behavior: smooth; }
 
 a { color: var(--hijau); text-decoration: none; }
 a:hover { text-decoration: underline; }
+
+/* ===== UTILITIES ===== */
+.mt-4 { margin-top: 24px; }
+.mt-3 { margin-top: 16px; }
+.mt-2 { margin-top: 10px; }
+.mb-4 { margin-bottom: 24px; }
+.text-right { text-align: right; }
+.text-center { text-align: center; }
+.text-danger { color: var(--merah); }
+.w-100 { width: 100%; }
 
 /* ===== LAYOUT & GRID ===== */
 .wrapper { display: flex; min-height: 100vh; }
